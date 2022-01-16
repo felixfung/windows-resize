@@ -1,0 +1,205 @@
+#!/usr/bin/perl
+#
+#------------------------------------------------------------------------------
+# expands current window to the next edge as long as there is no collision
+# (within current virtual desktop)
+# in one of four directions
+# takes in one parameter, 'W', 'N', 'E', or 'S'
+# to move windows in that direction
+# uses PERL and xdotool
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+# FOLLOWING SECTION REQUIRES USER CONFIGURATION:
+# set offsets based on desktop environment
+# take account of title bar, panel, etc width and height
+#------------------------------------------------------------------------------
+
+$win_offset_x = 0;
+$win_offset_y = 0;
+
+$panel_offset_W = 0;
+$panel_offset_N = 0;
+$panel_offset_E = 0;
+$panel_offset_S = 0;
+
+#------------------------------------------------------------------------------
+# read off direction argument
+#------------------------------------------------------------------------------
+
+if( $ARGV[0] eq "W" ) {
+    $axis = 'x';
+    $axis_rev = -1;
+}
+elsif( $ARGV[0] eq "N" ) {
+    $axis = 'y';
+    $axis_rev = -1;
+}
+elsif( $ARGV[0] eq "E" ) {
+    $axis ='x';
+    $axis_rev = 1;
+}
+elsif( $ARGV[0] eq "S" ) {
+    $axis = 'y';
+    $axis_rev = 1;
+}
+
+if( $axis eq 'x' ) {
+    $win_offset_1 = $win_offset_x;
+    $panel_offset_1 = $panel_offset_W;
+    $panel_offset_2 = $panel_offset_E;
+}
+else {
+    $win_offset_1 = $win_offset_y;
+    $panel_offset_1 = $panel_offset_N;
+    $panel_offset_2 = $panel_offset_S;
+}
+
+#------------------------------------------------------------------------------
+# grab screen and active window geometry
+#------------------------------------------------------------------------------
+
+$screen = `xdotool getdisplaygeometry`;
+if( $screen =~ /(\d+) (\d+)/ ) {
+    $screen = $1 if( $axis eq 'x' );
+    $screen = $2 if( $axis eq 'y' );
+}
+
+$active_window_pos = `xdotool getactivewindow getwindowgeometry`;
+if( $active_window_pos =~ /Position: (\d+),(\d+)/ ) {
+    $active_window_1 = $1 if( $axis eq 'x' );
+    $active_window_1 = $2 if( $axis eq 'y' );
+}
+if( $active_window_pos =~ /Geometry: (\d+)x(\d+)/ ) {
+    $active_window = $1 if( $axis eq 'x' );
+    $active_window = $2 if( $axis eq 'y' );
+}
+
+$edge[0] = $panel_offset_1;
+$edge[1] = $screen -$panel_offset_2 +$win_offset_1;
+
+#------------------------------------------------------------------------------
+# grab all other windows geometry and store as edge arrays
+#------------------------------------------------------------------------------
+
+@window_ids = split( "\n", `xdotool search --onlyvisible . 2>/dev/null` );
+
+foreach $wid (@window_ids) {
+    next if( $wid == `xdotool getactivewindow` );
+
+    $win_raw = `xdotool getwindowgeometry $wid`;
+    if( $win_raw =~ /Position: (\d+),(\d+)/ ) {
+        $win_left = $1;
+        $win_top = $2;
+    }
+    if( $win_raw =~ /Geometry: (\d+)x(\d+)/ ) {
+        $win_right = $win_left +$1;
+        $win_bottom = $win_top +$2;
+    }
+
+    if( $axis eq 'x' ) {
+        $win_1 = $win_left -$win_offset_1;
+        $win_2 = $win_right;
+    } else {
+        $win_1 = $win_top -$win_offset_1;
+        $win_2 = $win_bottom;
+    }
+
+    $tmp = $win_1; addEdge();
+    $tmp = $win_2; addEdge();
+}
+
+#------------------------------------------------------------------------------
+# sort edges arrays
+#------------------------------------------------------------------------------
+@edge_sorted = sort{ $a <=> $b } @edge;
+if( $axis_rev == -1 ) {
+    @edge_sorted = reverse(@edge_sorted);
+}
+
+#------------------------------------------------------------------------------
+# find next edge in the appropriate direction and move window, if applicable
+#------------------------------------------------------------------------------
+
+foreach $x (@edge_sorted) {
+    if( $axis_rev== 1 && ( $active_window_1 +$active_window +30 < $x )
+     || $axis_rev==-1 && ( $x +30 < $active_window_1 ) ) {
+        if( $x < $active_window_1 ) {
+            $x2 = $active_window_1 +$active_window;
+            $x1 = $x +$win_offset_1;
+            $x3 = $x2 -$x1;
+        }
+        else {
+            $x1 = $active_window_1;
+            $x2 = $x;
+            $x3 = $x2 -$x1;
+        }
+
+        # minimal size
+        next if( $x3 < 30 );
+
+        # check for collision
+        exit if( collided() eq true );
+
+        if( $axis eq 'x' ) {
+            system "xdotool getactivewindow windowmove $x1 y";
+            exec "xdotool getactivewindow windowsize $x3 y";
+        }
+        if( $axis eq 'y' ) {
+            system "xdotool getactivewindow windowmove x $x1";
+            exec "xdotool getactivewindow windowsize x $x3";
+        }
+    }
+}
+
+sub addEdge {
+    if( $panel_offset_1
+        < $tmp && $tmp <
+        $screen -$panel_offset_2
+    ) {
+        push( @edge, $tmp );
+    }
+}
+
+sub collided {
+    @window_ids = split( "\n", `xdotool search --onlyvisible . 2>/dev/null` );
+
+    foreach $wid (@window_ids) {
+        if( $wid == `xdotool getactivewindow` ) { next; }
+        $active_window_pos = `xdotool getactivewindow getwindowgeometry`;
+        if( $active_window_pos =~ /Position: ([-\d]+),([-\d]+)/ ) {
+            $Ax1 = $1;
+            $Ay1 = $2;
+        }
+        if( $active_window_pos =~ /Geometry: ([-\d]+)x([-\d]+)/ ) {
+            $Ax2 = $Ax1 +$1;
+            $Ay2 = $Ay1 +$2;
+        }
+
+        if( $axis eq 'x' ) {
+            $Ax1 = $x1;
+            $Ax2 = $x2;
+        }
+        else {
+            $Ay1 = $x1;
+            $Ay2 = $x2;
+        }
+
+        $win_raw = `xdotool getwindowgeometry $wid`;
+        if( $win_raw =~ /Position: ([-\d]+),([-\d]+)/ ) {
+            $Bx1 = $1;
+            $By1 = $2;
+        }
+        if( $win_raw =~ /Geometry: ([-\d]+)x([-\d]+)/ ) {
+            $Bx2 = $Bx1 +$1;
+            $By2 = $By1 +$2;
+        }
+
+        next if( $By1 <= 0 );
+
+        if( $Ax1<$Bx2 and $Ax2>$Bx1 and $Ay1<$By2 and $Ay2>$By1 ) {
+            return true;
+        }
+    }
+    return false;
+}
