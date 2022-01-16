@@ -76,7 +76,7 @@ if( $active_window_pos =~ /Geometry: (\d+)x(\d+)/ ) {
 }
 
 $edge[0] = $panel_offset_1;
-$edge[1] = $screen -$panel_offset_2 +$win_offset_1;
+$edge[1] = $screen -$panel_offset_2;
 
 #------------------------------------------------------------------------------
 # grab all other windows geometry and store as edge arrays
