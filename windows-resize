@@ -12,7 +12,7 @@
 #------------------------------------------------------------------------------
 # FOLLOWING SECTION REQUIRES USER CONFIGURATION:
 # set offsets based on desktop environment
-# take account of title bar, panel, etc width and height
+# take account of title bar, panel, etc width and height, edge snapping
 #------------------------------------------------------------------------------
 
 $win_offset_x = 0;
@@ -22,6 +22,8 @@ $panel_offset_W = 0;
 $panel_offset_N = 0;
 $panel_offset_E = 0;
 $panel_offset_S = 0;
+
+$snap = 30;
 
 #------------------------------------------------------------------------------
 # read off direction argument
@@ -122,8 +124,8 @@ if( $axis_rev == -1 ) {
 #------------------------------------------------------------------------------
 
 foreach $x (@edge_sorted) {
-    if( $axis_rev== 1 && ( $active_window_1 +$active_window +30 < $x )
-     || $axis_rev==-1 && ( $x +30 < $active_window_1 ) ) {
+    if( $axis_rev== 1 && ( $active_window_1 +$active_window +$snap < $x )
+     || $axis_rev==-1 && ( $x +$snap < $active_window_1 ) ) {
         if( $x < $active_window_1 ) {
             $x2 = $active_window_1 +$active_window;
             $x1 = $x +$win_offset_1;
@@ -136,7 +138,7 @@ foreach $x (@edge_sorted) {
         }
 
         # minimal size
-        next if( $x3 < 30 );
+        next if( $x3 < $snap );
 
         # check for collision
         exit if( collided() eq true );
@@ -153,9 +155,9 @@ foreach $x (@edge_sorted) {
 }
 
 sub addEdge {
-    if( $panel_offset_1
+    if( $panel_offset_1 +$snap
         < $tmp && $tmp <
-        $screen -$panel_offset_2
+        $screen -$panel_offset_2 -$snap
     ) {
         push( @edge, $tmp );
     }
