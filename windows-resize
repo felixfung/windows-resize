@@ -179,8 +179,8 @@ sub collided {
         }
 
         if( $axis eq 'x' ) {
-            $Ax1 = $x1;
-            $Ax2 = $x2;
+            $Cx1 = $x1;
+            $Cx2 = $x2;
         }
         else {
             $Ay1 = $x1;
@@ -199,7 +199,8 @@ sub collided {
 
         next if( $By1 <= 0 );
 
-        if( $Ax1<$Bx2 and $Ax2>$Bx1 and $Ay1<$By2 and $Ay2>$By1 ) {
+        if( !( $Ax1<$Bx2 and $Ax2>$Bx1 and $Ay1<$By2 and $Ay2>$By1 )
+          && $Cx1<$Bx2 and $Cx2>$Bx1 and $Ay1<$By2 and $Ay2>$By1 ) {
             return true;
         }
     }
